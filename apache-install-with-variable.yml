@@ -1,0 +1,47 @@
+---
+- name: configuring apache on chroot
+  hosts: {{ servername }}
+  become: yes
+  become_user: root
+  become_method: sudo
+#  vars:
+#    - appuser --user for http 
+#    - servername  -- details of host
+#    - apache_file -- tar file to copy specify with version
+#    - http_instance -- http directory name
+#    - apache_port -- port to use for apache
+  tasks:
+    - name: copying apache to {{ servername }}
+      copy:
+        src: files/{{ apache_file }}
+        dest: /chroot/
+        
+    - name: extracting apache archive
+      unarchive: 
+        src: /chroot/{{ apache_file }}
+        dest: /chroot/{{ http_instance }}
+        remote_src: yes
+        
+    - name: creating user for apache {{ appuser }}
+      user: "
+        name: {{ appuser }}"
+        shell: /bin/false
+        
+    - name: copying user details to password and group files
+      shell: grep {{ appuser }} /etc/passwd > /chroot/{{ http_instance }}/etc/passwd && grep {{ appuser }} /etc/group > /chroot/{{ http_instance }}/etc/group
+    
+    - name: copying config httpd.conf
+      template:
+        src: template/httpd_template.j2
+        dest: /chroot/{{ http_instance }}/etc/httpd/conf/httpd.conf
+       
+    - name: update {{ http_instance }} permission
+      file:
+        path: /chroot/{{ http_instance }}
+        owner: "{{ appuser }}"
+        group: "{{ appuser }}"
+        recurse: yes
+        
+    - name: start chrooted apache
+      shell: /chroot/{{ http_instance }}/usr/sbin/apachectl start
+      
